@@ -449,16 +449,25 @@ def luminous_efficacy_540_THz : Measure Float := {quantity:= 683.0, quality:=lum
 
 
 def scalar_23 := set_decimalQ scalar_dec 23
-
+def scalar__23 := set_decimalQ scalar_dec (-23)
+def scalar__19 := set_decimalQ scalar_dec (-19)
 
 def avogadro_n : Measure Float := {quantity:=6.02214076, quality:= (scalar_23 / am_subst)}
 
 def av_no:= solve_decimal_to avogadro_n 20
 
-#eval av_no.quantity
-#eval QtoString avogadro_n.quality
+def scalar__34 := set_decimalQ scalar_dec (-34)
 
-def deca : Measure Float := {quantity:= 683.0, quality:=lum_efficacy}
+-- Planck constant	6.62607015
+def h: Measure Float := {quantity:=6.62607015, quality:= (scalar__34 * time * energy)}
+
+-- k	Boltzmann constant	1.380649×10−23 J/K
+def k: Measure Float := {quantity:=1.380649, quality:= (scalar__23 * energy/ temp)}
+
+-- e	elementary charge	1.602176634×10−19 C
+def e: Measure Float := {quantity:=1.380649, quality:= (scalar__19 * e_charge)}
+
+
 
 
 
@@ -497,14 +506,17 @@ def measureDict2 (α : Type) [Inhabited α] [ToString α]: Type :=
 
 def measureDict (α : Type) [ToString α] [Inhabited α] := dict String (Measure α)
 
-def constants : measureDict Float := Batteries.HashMap.empty
+def constants : dict String (Measure Float) :=  empty_dict
 
 -- def constants : measureDict Float := Batteries.HashMap.empty
 -- empty_dict
 
-dict_insert constants "c" c
+def con := dict_insert constants "c" c
+def con2 := dict_insert con "freq_Cs" freq_Cs
+def con3 := dict_insert con2 "avogadro_n" avogadro_n
 
-#check dict_lookup constants "c"
-def f:=dict_lookup constants "c"
-#check f.quantity
+#check dict_lookup con "c"
+def f:=dict_lookup con3 "avogadro_n"
+#eval f
+
 -- measureDict
