@@ -57,7 +57,6 @@ structure Quality extends PreQuality where
   composed : dict PreQuality ℤ := zero_dict
   is_base : Bool := false
 
-
 def scalar : Quality := {name:="Scalar", short:="U", unit:="u", unit_symbol:="1", composed:= empty_dict}
 
 def canon (q : Quality) : Quality :=
@@ -69,6 +68,14 @@ def canon (q : Quality) : Quality :=
 
 def preToQ (pq: PreQuality) : Quality :=
   {name:= pq.name, short:= pq.short, unit:= pq.unit, unit_symbol:= pq.unit_symbol, composed:= (dict_insert zero_dict pq 1), is_base:= true}
+
+def prezeroQ: PreQuality := {name:="zeroQ", short:="0q", unit:="tzenit", unit_symbol:="tz"}
+
+-- zeroQ is the identity element for addition for Quality
+def zeroQ: Quality := preToQ prezeroQ
+
+-- oneQ is the identity element for multiplication for Quality
+def oneQ: Quality := scalar
 
 def QtoString (q : Quality) : String :=
   let lst1 := q.composed.fold (fun acc k v => (k.unit_symbol ++ "^" ++ (toString v)):: acc) []
@@ -83,18 +90,9 @@ def mergeHashMaps (m1 m2 : dict PreQuality Int) : dict PreQuality Int :=
       | none    => acc.insert k v1) m2)
       0
 
--- def zeroHashMaps (m : dict PreQuality Int) : dict PreQuality Int :=
---   m.fold (fun k v1 =>
---     0)
-
--- def zeroInt : Int := 0
-
--- -- Modify the function to use a specific zero value if needed
--- def setValuesToZero (d : dict PreQuality Int) : dict PreQuality Int :=
---   let zeroValue : Int := zeroInt -- Adjust if needed for other types
---   d.fold(fun acc k v =>
---     -- Insert each key with a zero value into the accumulator
---     acc.insert k zeroInt) zero_dict
+def mulHashMaps (m1 : dict PreQuality Int) (c: Int): dict PreQuality Int :=
+  m1.fold (fun acc k v =>
+    dict_insert acc k (v * c)) empty_dict
 
 -- Define the function to calculate the difference between two hash maps
 def diffHashMaps (m1 m2 : dict PreQuality Int) : dict PreQuality Int :=
@@ -115,6 +113,61 @@ def diffHashMaps (m1 m2 : dict PreQuality Int) : dict PreQuality Int :=
   ) intermediateResult
 
   removeZeroValues finalResult 0
+
+def preforced: PreQuality := {name:="Non-Quality", short:="N", unit:="none", unit_symbol:="n", definition:="This is intended as an error message."}
+
+def forced: Quality := preToQ preforced
+
+def eqQ  (p : Quality) (q : Quality) : Bool :=
+  if eqHashMaps (removeZeroValues p.composed 0) (removeZeroValues q.composed 0) then
+    true
+  else
+    false
+
+-- Define an instance of BEq for Quality
+instance : BEq Quality where
+  beq x y := eqQ x y
+
+-- it handles the identity element zeroQ as a separate case
+def addQ (p : Quality) (q : Quality) :  Quality :=
+  if eqHashMaps p.composed q.composed then
+    p
+  else
+    if eqHashMaps p.composed zeroQ.composed then
+      q
+    else
+      if eqHashMaps q.composed zeroQ.composed then
+        p
+      else
+        forced
+
+
+
+-- Define an instance of HAdd for Quality
+instance : HAdd Quality Quality Quality :=
+{
+  hAdd := addQ
+}
+
+-- it handles the identity element zeroQ as a separate case
+def subQ (p : Quality) (q : Quality) :  Quality :=
+  if eqHashMaps p.composed q.composed then
+    p
+  else
+    if eqHashMaps p.composed zeroQ.composed then
+      q
+    else
+      if eqHashMaps q.composed zeroQ.composed then
+        p
+      else
+        forced
+
+
+-- Define an instance of HAdd for Quality
+instance : HSub Quality Quality Quality :=
+{
+  hSub := subQ
+}
 
 def mulQ (p : Quality) (q : Quality) :  Quality :=
   canon {composed:= mergeHashMaps p.composed q.composed,name:= p.name ++ "·" ++ q.name, short:=p.short ++ "·" ++ q.short, unit:=p.unit ++ "·" ++ q.unit, unit_symbol:=p.unit_symbol ++ "·" ++ q.unit_symbol}
@@ -139,17 +192,15 @@ instance : HDiv Quality Quality Quality :=
 class Pow (α : Type) where
   pow : α → Int → α
 
--- Provide an instance of Pow for Measure
--- instance : Pow Quality  where
---   pow a 0 := {name:= a.name ++ "^" ++ "0", short:="u", unit:= (a.unit ++ "^" ++ "0"), unit_symbol:= (a.unit_symbol ++ "^" ++ "0"), composed:= zero_dict}
---   pow a n := if n > 0 then { value := a.value ^ n.toNat } else { value := 1.0 / (a.value ^ (-n).toNat) }
+-- Provide an instance of Pow for Quality
+instance : Pow Quality where
+  pow a n := {composed:= (mulHashMaps a.composed n), name:= a.name ++ "^" ++ (toString n), short:=a.short ++ "^" ++ (toString n), unit:=a.unit ++ "^" ++ (toString n), unit_symbol:= a.unit_symbol ++ "^" ++ (toString n)}
 
--- Define a custom notation for MyType exponentiation
-infixl:80 " ^ " => Pow.pow
+-- Define a custom notation for Quality exponentiation
+notation a " ^ " b => Pow.pow a b
 
-def preforced: PreQuality := {name:="Non-Quality", short:="N", unit:="none", unit_symbol:="n", definition:="This is intended as an error message."}
+-- notation:80 lhs:81 " ^ " rhs:80 => HPow.hPow lhs rhs
 
-def forced: Quality := preToQ preforced
 
 def predecimal: PreQuality := {name:="Decimal", short:="dec", unit:="deci", unit_symbol:="10", definition:="Powers of 10."}
 
@@ -190,12 +241,24 @@ def prelum_intensity: PreQuality := {name:="Luminous Intensity", short:="J", uni
 
 def lum_intensity: Quality := preToQ prelum_intensity
 
-def equal (p : Quality) (q : Quality): Bool :=
-  eqHashMaps p.composed q.composed
+-- def equal (p : Quality) (q : Quality): Bool :=
+--   eqHashMaps p.composed q.composed
 
-def area0: Quality := length * length
+def area0: Quality := Pow.pow length 2
 
 def area: Quality := {name:="Area", short:="area", unit:="meter square", unit_symbol:="m^2", composed:= area0.composed}
+
+def area2 := area + zeroQ
+
+def area3 := zeroQ + area
+
+def area4 := area / area
+
+#eval area == oneQ
+
+#eval QtoString area3
+
+#eval QtoString area4
 
 def volume0: Quality := area * length
 
@@ -346,7 +409,7 @@ def SI : List Quality := [
 
 -- This will find all qualities that are compatible from the SI
 def fromSI (p : Quality): List Quality :=
-  List.filter (λ x => equal x p) SI
+  List.filter (λ x => x == p) SI
 
 def set_decimalQ (q:Quality) (d:Int) : Quality :=
   {
@@ -373,34 +436,45 @@ def scalar_dec : Quality := decimal
 def non_measure [Inhabited α] [ToString α]: Measure α :=
   { quality := forced, quantity := default }
 
+-- not sure what the "default" value is: it is usually the identity for +
+-- in this case zero_measure is the identity element for Measure
+def zero_measure [Inhabited α] [ToString α]: Measure α :=
+  { quality := zeroQ, quantity := default }
+
+-- one_measure is only defined here for Measure Float. It needs to be defined for each α for Measure α
+-- one_measure is the identity element for multiplication for Measure
+def one_measure: Measure Float := { quality := scalar, quantity := 1.0 }
+
+#eval one_measure.quantity
+#eval QtoString one_measure.quality
+
+
+
 
 def add {α : Type} [Inhabited α] [ToString α](m: Measure α ) (n: Measure α ) [HAdd α α α]: Measure α :=
-  if equal m.quality n.quality then
-    let q:α := m.quantity + n.quantity
-    {quality:=m.quality, quantity:= q}
-  else
+  let aq := m.quality + n.quality
+  if aq == forced then
     non_measure
+  else
+    let q:α := m.quantity + n.quantity
+    {quality:= aq, quantity:= q}
+
 
 
 -- Define an instance of HAdd for Measure
--- instance : HAdd  (α : Type)  Measure α Measure Measure :=
+-- instance {α : Type} [Inhabited α] [ToString α] [HAdd α α α] : HAdd (Measure α) (Measure α) (Measure α) :=
 -- {
 --   hAdd := add
 -- }
 
--- Define an instance of HAdd for Measure
--- instance {α : Type} [Inhabited α] [HAdd α α α] : HAdd (Measure α) (Measure α) (Measure α) :=
--- {
---   hAdd := add α
--- }
-
 
 def sub {α : Type} [Inhabited α] [ToString α] (m: Measure α ) (n: Measure α ) [HSub α α α]: Measure α :=
-  if equal m.quality n.quality then
-    let q:α := m.quantity - n.quantity
-    {quality:=m.quality, quantity:= q}
-  else
+  let aq := m.quality - n.quality
+  if aq == forced then
     non_measure
+  else
+    let q:α := m.quantity - n.quantity
+    {quality:= aq, quantity:= q}
 
 def mul {α : Type} [Inhabited α] [ToString α] (m: Measure α ) (n: Measure α ) [HMul α α α]: Measure α :=
   {quality:= {composed:= mergeHashMaps m.quality.composed n.quality.composed,name:= n.quality.name ++ "·" ++ m.quality.name, short:="", unit:="", unit_symbol:=""}, quantity:= n.quantity * m.quantity}
@@ -427,10 +501,6 @@ instance {α : Type} [ToString α] [Inhabited α] : ToString (Measure α) where
     -- m.quantity.toString ++ unit
     unit
 
--- def toString {α : Type} [Inhabited α] [ToString α] (m : Measure α ): String :=
---   -- let val := α
---   let unit := QtoString m.quality
---   (m.quality.name) ++ ": " ++  m.quantity.toString ++ unit
 
 def m_m1 : Measure Float := {quality:= mass, quantity:= 10.6}
 
@@ -469,9 +539,7 @@ def e: Measure Float := {quantity:=1.380649, quality:= (scalar__19 * e_charge)}
 
 
 
-
-
-def m_m3 := add m_m1 m_m2
+def m_m3 := add m_m1 zero_measure
 
 def m_m4 := mul m_m1 m_m2
 
