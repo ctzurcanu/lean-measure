@@ -12,13 +12,15 @@ def dict (key value: Type)  [BEq key] [Hashable key] := Batteries.HashMap key va
 def empty_dict {key: Type} [BEq key] [Hashable key] : dict key value :=
   Batteries.HashMap.empty
 
-def removeZeroValues {key value: Type} [BEq key] [Hashable key] [BEq value] (d : dict key value) (val0 : value): dict key value :=
+def removeZeroValues {key value: Type} [BEq key] [Hashable key] [BEq value]
+  (d : dict key value) (val0 : value): dict key value :=
   -- Fold over the hash map to filter out entries with value val0
   d.fold (fun acc k v =>
     if v != val0 then acc.insert k v else acc) empty_dict
 
 -- Define the Repr instance for dict
-instance {key value : Type} [BEq key] [Hashable key] [Repr key] [Repr value] : Repr (dict key value) where
+instance {key value : Type} [BEq key] [Hashable key] [Repr key] [Repr value]
+  : Repr (dict key value) where
   reprPrec d _ := repr d.toList
 
 def eqHashMaps {K V : Type} [BEq K] [Hashable K] [BEq V] (m1 m2 : Batteries.HashMap K V) : Bool :=
@@ -31,11 +33,13 @@ def eqHashMaps {K V : Type} [BEq K] [Hashable K] [BEq V] (m1 m2 : Batteries.Hash
   ) true
 
 -- Function to insert a key-value pair into the HashMap
-def dict_insert {key : Type} [BEq key] [Hashable key] (d : dict key value) (k : key) (v : value) : dict key value :=
+def dict_insert {key : Type} [BEq key] [Hashable key]
+  (d : dict key value) (k : key) (v : value) : dict key value :=
   d.insert k v
 
 -- Function to lookup a value by key in the HashMap
-def dict_lookup {key value : Type} [BEq key] [Hashable key] (d : dict key value) (k : key) : Option value :=
+def dict_lookup {key value : Type} [BEq key] [Hashable key]
+  (d : dict key value) (k : key) : Option value :=
   d.find? k
 
 
@@ -57,19 +61,43 @@ structure Quality extends PreQuality where
   composed : dict PreQuality ℤ := zero_dict
   is_base : Bool := false
 
-def scalar : Quality := {name:="Scalar", short:="U", unit:="u", unit_symbol:="1", composed:= empty_dict}
+def preDictToString (d: dict PreQuality ℤ ) : String :=
+  let lst1 := d.fold (fun acc k v => (k.unit_symbol ++ "^" ++ (toString v)):: acc) []
+  let lst2 := lst1.map toString
+  String.intercalate "·" lst2
+
+
+def scalar : Quality :=
+  { name := "Scalar",
+    short := "U",
+    unit := "u",
+    unit_symbol := "1",
+    composed := empty_dict }
 
 def canon (q : Quality) : Quality :=
   let nq := removeZeroValues q.composed 0
   if eqHashMaps nq zero_dict then
     scalar
   else
-    {name:= q.name, short:= q.short, unit:= q.unit, unit_symbol:= q.unit_symbol, composed:= nq}
+    { name:= q.name,
+      short:= q.short,
+      unit:= q.unit,
+      unit_symbol := q.unit_symbol,
+      composed:= nq}
 
 def preToQ (pq: PreQuality) : Quality :=
-  {name:= pq.name, short:= pq.short, unit:= pq.unit, unit_symbol:= pq.unit_symbol, composed:= (dict_insert zero_dict pq 1), is_base:= true}
+  { name := pq.name,
+    short := pq.short,
+    unit := pq.unit,
+    unit_symbol := pq.unit_symbol,
+    composed := (dict_insert zero_dict pq 1),
+    is_base := true }
 
-def prezeroQ: PreQuality := {name:="zeroQ", short:="0q", unit:="tzenit", unit_symbol:="tz"}
+def prezeroQ: PreQuality :=
+  { name := "zeroQ",
+    short := "0q",
+    unit := "tzenit",
+    unit_symbol := "tz" }
 
 -- zeroQ is the identity element for addition for Quality
 def zeroQ: Quality := preToQ prezeroQ
@@ -78,9 +106,9 @@ def zeroQ: Quality := preToQ prezeroQ
 def oneQ: Quality := scalar
 
 def QtoString (q : Quality) : String :=
-  let lst1 := q.composed.fold (fun acc k v => (k.unit_symbol ++ "^" ++ (toString v)):: acc) []
-  let lst2 := lst1.map toString
-  q.name ++ " " ++ q.short ++ " " ++ q.unit  ++ " " ++  q.unit_symbol ++ " " ++  String.intercalate "·" lst2 ++ " " ++ q.definition
+  q.name ++ "|" ++ q.short ++ " " ++ q.unit  ++ " (" ++
+    q.unit_symbol ++ ") " ++ (preDictToString q.composed) ++
+    " " ++ q.definition
 
 def mergeHashMaps (m1 m2 : dict PreQuality Int) : dict PreQuality Int :=
   removeZeroValues
@@ -114,7 +142,12 @@ def diffHashMaps (m1 m2 : dict PreQuality Int) : dict PreQuality Int :=
 
   removeZeroValues finalResult 0
 
-def preforced: PreQuality := {name:="Non-Quality", short:="N", unit:="none", unit_symbol:="n", definition:="This is intended as an error message."}
+def preforced: PreQuality :=
+  { name := "Non-Quality",
+    short := "N",
+    unit := "none",
+    unit_symbol := "n",
+    definition := "This is intended as an error message." }
 
 def forced: Quality := preToQ preforced
 
@@ -170,7 +203,12 @@ instance : HSub Quality Quality Quality :=
 }
 
 def mulQ (p : Quality) (q : Quality) :  Quality :=
-  canon {composed:= mergeHashMaps p.composed q.composed,name:= p.name ++ "·" ++ q.name, short:=p.short ++ "·" ++ q.short, unit:=p.unit ++ "·" ++ q.unit, unit_symbol:=p.unit_symbol ++ "·" ++ q.unit_symbol}
+  canon
+    { composed := mergeHashMaps p.composed q.composed,
+      name := p.name ++ "·" ++ q.name,
+      short := p.short ++ "·" ++ q.short,
+      unit := p.unit ++ "·" ++ q.unit,
+      unit_symbol := p.unit_symbol ++ "·" ++ q.unit_symbol }
 
 
 -- Define an instance of HMul for Quality
@@ -181,7 +219,12 @@ instance : HMul Quality Quality Quality :=
 
 
 def divQ (p : Quality) (q : Quality) :  Quality :=
-  canon {composed:= diffHashMaps p.composed q.composed,name:= p.name ++ "/" ++ q.name, short:=p.short ++ "/" ++ q.short, unit:=p.unit ++ "·" ++ q.unit, unit_symbol:=p.unit_symbol ++ "/" ++ q.unit_symbol}
+  canon
+    { composed := diffHashMaps p.composed q.composed,
+      name := p.name ++ "/" ++ q.name,
+      short := p.short ++ "/" ++ q.short,
+      unit := p.unit ++ "/" ++ q.unit,
+      unit_symbol := p.unit_symbol ++ "/" ++ q.unit_symbol }
 
 instance : HDiv Quality Quality Quality :=
 {
@@ -194,7 +237,12 @@ class Pow (α : Type) where
 
 -- Provide an instance of Pow for Quality
 instance : Pow Quality where
-  pow a n := {composed:= (mulHashMaps a.composed n), name:= a.name ++ "^" ++ (toString n), short:=a.short ++ "^" ++ (toString n), unit:=a.unit ++ "^" ++ (toString n), unit_symbol:= a.unit_symbol ++ "^" ++ (toString n)}
+  pow a n :=
+    { composed := (mulHashMaps a.composed n),
+      name := a.name ++ "^" ++ (toString n),
+      short := a.short ++ "^" ++ (toString n),
+      unit := a.unit ++ "^" ++ (toString n),
+      unit_symbol := a.unit_symbol ++ "^" ++ (toString n) }
 
 -- Define a custom notation for Quality exponentiation
 notation a " ^ " b => Pow.pow a b
@@ -202,13 +250,23 @@ notation a " ^ " b => Pow.pow a b
 -- notation:80 lhs:81 " ^ " rhs:80 => HPow.hPow lhs rhs
 
 
-def predecimal: PreQuality := {name:="Decimal", short:="dec", unit:="deci", unit_symbol:="10", definition:="Powers of 10."}
+def predecimal: PreQuality :=
+  { name := "Decimal",
+    short := "dec",
+    unit := "deci",
+    unit_symbol := "10",
+    definition := "Powers of 10." }
 
 def decimal: Quality := preToQ predecimal
 
 
 
-def prelength: PreQuality := {name:="Length", short:="L", unit:="metre", unit_symbol:="m", definition:="The distance travelled by light in vacuum in 1/299792458 second."}
+def prelength: PreQuality :=
+  { name := "Length",
+    short := "L",
+    unit := "metre",
+    unit_symbol := "m",
+    definition := "The distance travelled by light in vacuum in 1/299792458 second." }
 
 def length: Quality := preToQ prelength
 
@@ -217,36 +275,80 @@ def l_0 : Quality := length * length
 #check l_0
 #eval QtoString l_0
 
-def premass: PreQuality := {name:="Mass", short:="M", unit:="kilogram", unit_symbol:="kg", definition:="The kilogram is defined by setting the Planck constant h to 6.62607015×10−34 J⋅s (J = kg⋅m2⋅s−2), given the definitions of the metre and the second."}
+def premass: PreQuality :=
+  { name := "Mass",
+    short := "M",
+    unit := "kilogram",
+    unit_symbol := "kg",
+    definition := "The kilogram is defined by setting " ++
+    "the Planck constant h to 6.62607015×10−34 J⋅s (J = kg⋅m2⋅s−2), " ++
+    "given the definitions of the metre and the second." }
 
 def mass: Quality := preToQ premass
 
-def pretime: PreQuality := {name:="Time", short:="T", unit:="second", unit_symbol:="s", definition:="The duration of 9192631770 periods of the radiation corresponding to the transition between the two hyperfine levels of the ground state of the caesium-133 atom."}
+def pretime: PreQuality :=
+  { name := "Time",
+    short := "T",
+    unit := "second",
+    unit_symbol := "s",
+    definition := "The duration of 9192631770 periods of the radiation corresponding to the" ++
+    "transition between the two hyperfine levels of the ground state of the
+    caesium-133 atom." }
 
 def time: Quality := preToQ pretime
 
-def pree_current: PreQuality := {name:="Electric Current", short:="I", unit:="ampere", unit_symbol:="A", definition:="The flow of 1/1.602176634×10−19 times the elementary charge e per second, which is approximately 6.2415090744×1018 elementary charges per second."}
+def pree_current: PreQuality :=
+  { name := "Electric Current",
+    short := "I",
+    unit := "ampere",
+    unit_symbol := "A",
+    definition := "The flow of 1/1.602176634×10−19 times the elementary " ++
+    "charge e per second, which is approximately 6.2415090744×1018 elementary charges per second." }
 
 def e_current: Quality := preToQ pree_current
 
-def pretemp: PreQuality := {name:="Therodinamic Temperature", short:="Θ", unit:="kelvin", unit_symbol:="K", definition:="The kelvin is defined by setting the fixed numerical value of the Boltzmann constant k to 1.380649×10^−23 J⋅K−1, (J = kg⋅m^2⋅s^−2), given the definition of the kilogram, the metre, and the second."}
+def pretemp: PreQuality :=
+  { name := "Therodinamic Temperature",
+    short := "Θ",
+    unit := "kelvin",
+    unit_symbol := "K",
+    definition := "The kelvin is defined by setting the fixed numerical value of " ++
+    "the Boltzmann constant k to 1.380649×10^−23 J⋅K−1, (J = kg⋅m^2⋅s^−2), " ++
+    "given the definition of the kilogram, the metre, and the second."}
 
 def temp: Quality := preToQ pretemp
 
-def pream_subst: PreQuality := {name:="Amount of Substance", short:="N", unit:="mole", unit_symbol:="mol", definition:="The amount of substance of 6.02214076×10^23 elementary entities. This number is the fixed numerical value of the Avogadro constant, NA, when expressed in the unit mol^−1."}
+def pream_subst: PreQuality :=
+  { name := "Amount of Substance",
+    short := "N",
+    unit := "mole",
+    unit_symbol := "mol",
+    definition := "The amount of substance of 6.02214076×10^23 elementary entities. " ++
+    "This number is the fixed numerical value of the Avogadro constant, " ++
+    "NA, when expressed in the unit mol^−1."}
 
 def am_subst: Quality := preToQ pream_subst
 
-def prelum_intensity: PreQuality := {name:="Luminous Intensity", short:="J", unit:="candela", unit_symbol:="cd", definition:="The duration of 9192631770 periods of the radiation corresponding to the transition between the two hyperfine levels of the ground state of the caesium-133 atom."}
+def prelum_intensity: PreQuality :=
+  { name := "Luminous Intensity",
+    short := "J",
+    unit := "candela",
+    unit_symbol := "cd",
+    definition := "The duration of 9192631770 periods of the radiation corresponding " ++
+    "to the transition between the two hyperfine levels of the " ++
+    "ground state of the caesium-133 atom."}
 
 def lum_intensity: Quality := preToQ prelum_intensity
 
--- def equal (p : Quality) (q : Quality): Bool :=
---   eqHashMaps p.composed q.composed
 
 def area0: Quality := Pow.pow length 2
 
-def area: Quality := {name:="Area", short:="area", unit:="meter square", unit_symbol:="m^2", composed:= area0.composed}
+def area: Quality :=
+  { name := "Area",
+    short := "area",
+    unit := "meter square",
+    unit_symbol := "m^2",
+    composed := area0.composed }
 
 def area2 := area + zeroQ
 
@@ -256,108 +358,228 @@ def area4 := area / area
 
 #eval area == oneQ
 
-#eval QtoString area3
+#eval QtoString area
 
 #eval QtoString area4
 
-def volume0: Quality := area * length
+def volume0: Quality := Pow.pow length 3
 
-def volume: Quality := {name:="Volume", short:="volume", unit:="meter cube", unit_symbol:="m^3", composed:= volume0.composed}
+def volume: Quality :=
+  { name := "Volume",
+    short := "volume",
+    unit := "meter cube",
+    unit_symbol := "m^3",
+    composed := volume0.composed }
 
 def speed0: Quality := length / time
 
-def speed: Quality := {name:="Velocity", short:="v", unit:="meter/second", unit_symbol:="m/s", composed:= speed0.composed}
+def speed: Quality :=
+  { name := "Speed",
+    short := "v",
+    unit := "meter/second",
+    unit_symbol := "m/s",
+    composed := speed0.composed }
 
-def acceleration0: Quality := length / time /time
+def acceleration0: Quality := length / Pow.pow time 2
 
-def acceleration: Quality := {name:="Acceleration", short:="a", unit:="meter/second^2", unit_symbol:="m/s^2", composed:= acceleration0.composed}
+def acceleration: Quality :=
+  { name := "Acceleration",
+    short := "a",
+    unit := "meter/second^2",
+    unit_symbol := "m/s^2",
+    composed := acceleration0.composed }
 
 def p_angle0 := length/length
 
-def p_angle: Quality := {name:="Plane Angle", short:="angle", unit:="radian", unit_symbol:="rad", composed:= p_angle0.composed}
+def p_angle: Quality :=
+  { name := "Plane Angle",
+    short := "angle",
+    unit := "radian",
+    unit_symbol := "rad",
+    composed := p_angle0.composed }
 
-def s_angle0 := length * length/(length * length)
+def s_angle0 := Pow.pow length 2 / Pow.pow length 2
 
-def s_angle: Quality := {name:="Solid Angle", short:="angle", unit:="steradian", unit_symbol:="sr", composed:= s_angle0.composed}
+def s_angle: Quality :=
+  { name := "Solid Angle",
+    short := "angle",
+    unit := "steradian",
+    unit_symbol := "sr",
+    composed := s_angle0.composed }
 
 def frequency0 := scalar / time
 
-def frequency: Quality := {name:="Frequency", short:="frequency", unit:="hertz", unit_symbol:="Hz", composed:= frequency0.composed}
+def frequency: Quality :=
+  { name := "Frequency",
+    short := "frequency",
+    unit := "hertz",
+    unit_symbol := "Hz",
+    composed := frequency0.composed }
 
-def force0 := mass * length / (time * time)
+def force0 := mass * length / Pow.pow time 2
 
-def force: Quality := {name:="Force", short:="force", unit:="newton", unit_symbol:="N", composed:= force0.composed}
+def force: Quality :=
+  { name := "Force",
+    short := "force",
+    unit := "newton",
+    unit_symbol := "N",
+    composed := force0.composed }
 
 def pressure0 := mass / (length * time * time)
 
-def pressure: Quality := {name:="Pressure", short:="pressure", unit:="pascal", unit_symbol:="Pa", composed:= pressure0.composed}
+def pressure: Quality :=
+  { name := "Pressure",
+    short := "pressure",
+    unit := "pascal",
+    unit_symbol := "Pa",
+    composed := pressure0.composed }
 
-def energy0 := mass *length *length / ( time * time)
+def energy0 := mass * Pow.pow length 2 / Pow.pow time 2
 
-def energy: Quality := {name:="Energy", short:="energy", unit:="joule", unit_symbol:="J", composed:= energy0.composed}
+def energy: Quality :=
+  { name := "Energy",
+    short := "energy",
+    unit := "joule",
+    unit_symbol := "J",
+    composed := energy0.composed }
 
-def power0 := mass *length *length / ( time * time * time)
+def power0 := mass * Pow.pow length 2 / Pow.pow time 3
 
-def power: Quality := {name:="Power", short:="power", unit:="watt", unit_symbol:="W", composed:= power0.composed}
+def power: Quality :=
+  { name := "Power",
+    short := "power",
+    unit := "watt",
+    unit_symbol := "W",
+    composed := power0.composed }
 
 def e_charge0 := e_current * time
 
-def e_charge: Quality := {name:="Electric Charge", short:="charge", unit:="coulomb", unit_symbol:="C", composed:= e_charge0.composed}
+def e_charge: Quality :=
+  { name := "Electric Charge",
+    short := "charge",
+    unit := "coulomb",
+    unit_symbol := "C",
+    composed := e_charge0.composed }
 
 def e_potential0 := energy / e_charge
 
-def e_potential: Quality := {name:="Electric Potential", short:="voltage", unit:="volt", unit_symbol:="V", composed:= e_potential0.composed}
+def e_potential: Quality :=
+  { name := "Electric Potential",
+    short := "voltage",
+    unit := "volt",
+    unit_symbol := "V",
+    composed := e_potential0.composed }
 
 def capacitance0 := e_charge / e_potential
 
-def capacitance: Quality := {name:="Capacitance", short:="capacitance", unit:="farad", unit_symbol:="F", composed:= capacitance0.composed}
+def capacitance: Quality :=
+  { name := "Capacitance",
+    short := "capacitance",
+    unit := "farad",
+    unit_symbol := "F",
+    composed := capacitance0.composed }
 
 def resistance0 := e_potential / e_current
 
-def resistance: Quality := {name:="Resistance", short:="resistance", unit:="ohm", unit_symbol:="Ω", composed:= resistance0.composed}
+def resistance: Quality :=
+  { name := "Resistance",
+    short := "resistance",
+    unit := "ohm",
+    unit_symbol := "Ω",
+    composed := resistance0.composed }
 
 def conductance0 := scalar / resistance
 
-def conductance: Quality := {name:="Electrical Conductance", short:="conductance", unit:="siemens", unit_symbol:="S", composed:= conductance0.composed}
+def conductance: Quality :=
+  { name := "Electrical Conductance",
+    short := "conductance",
+    unit := "siemens",
+    unit_symbol := "S",
+    composed := conductance0.composed }
 
 def mag_flux0 := e_potential * time
 
-def mag_flux: Quality := {name:="Magnetic Flux", short:="magnetic flux", unit:="weber", unit_symbol:="Wb", composed:= mag_flux0.composed}
+def mag_flux: Quality :=
+  { name := "Magnetic Flux",
+    short := "magnetic flux",
+    unit := "weber",
+    unit_symbol := "Wb",
+    composed := mag_flux0.composed }
 
 def mag_flux_dens0 := mag_flux / area
 
-def mag_flux_dens: Quality := {name:="Magnetic Flux Density", short:="magnetic flux density", unit:="tesla", unit_symbol:="T", composed:= mag_flux_dens0.composed}
+def mag_flux_dens: Quality :=
+  { name := "Magnetic Flux Density",
+    short := "magnetic flux density",
+    unit := "tesla",
+    unit_symbol := "T",
+    composed := mag_flux_dens0.composed }
 
 def inductance0 := mag_flux / e_current
 
-def inductance: Quality := {name:="Inductance", short:="inductance", unit:="henry", unit_symbol:="H", composed:= inductance0.composed}
+def inductance: Quality :=
+  { name := "Inductance",
+    short := "inductance",
+    unit := "henry",
+    unit_symbol := "H",
+    composed := inductance0.composed }
 
 def lum_flux0 := lum_intensity * s_angle
 
-def lum_flux: Quality := {name:="Luminous Flux", short:="luminous flux", unit:="lumen", unit_symbol:="lm", composed:= lum_flux0.composed}
+def lum_flux: Quality :=
+  { name := "Luminous Flux",
+    short := "luminous flux",
+    unit := "lumen",
+    unit_symbol := "lm",
+    composed := lum_flux0.composed }
 
 def illuminance0 := lum_intensity * s_angle  / area
 
-def illuminance: Quality := {name:="Luminous Flux", short:="luminous flux", unit:="lumen", unit_symbol:="lm", composed:= illuminance0.composed}
+def illuminance: Quality :=
+  { name := "Luminous Flux",
+    short := "luminous flux",
+    unit := "lumen",
+    unit_symbol := "lm",
+    composed := illuminance0.composed }
 
 
 def decay0 := scalar / time
 
-def decay: Quality := {name:="Decays per Time", short:="decay", unit:="becquerel", unit_symbol:="Bq", composed:= decay0.composed}
+def decay: Quality :=
+  { name := "Decays per Time",
+    short := "decay",
+    unit := "becquerel",
+    unit_symbol := "Bq",
+    composed := decay0.composed }
 
 
-def ab_dose0 := area / (time * time)
+def ab_dose0 := area / Pow.pow time 2
 
-def ab_dose: Quality := {name:="Absorbed Dose", short:="absorbed dose", unit:="gray", unit_symbol:="Gy", composed:= ab_dose0.composed}
+def ab_dose: Quality :=
+  { name := "Absorbed Dose",
+    short := "absorbed dose",
+    unit := "gray",
+    unit_symbol := "Gy",
+    composed := ab_dose0.composed }
 
-def eq_dose0 := area / (time * time)
+def eq_dose0 := area / Pow.pow time 2
 
-def eq_dose: Quality := {name:="Equivalent Dose", short:="equivalent dose", unit:="sievert", unit_symbol:="Sv", composed:= eq_dose0.composed}
+def eq_dose: Quality :=
+  { name := "Equivalent Dose",
+    short := "equivalent dose",
+    unit := "sievert",
+    unit_symbol := "Sv",
+    composed := eq_dose0.composed }
 
 
 def cat_activity0 := am_subst / time
 
-def cat_activity: Quality := {name:="Catalytic Activity", short:="catalytic activity", unit:="katal", unit_symbol:="kat", composed:= cat_activity0.composed}
+def cat_activity: Quality :=
+  { name := "Catalytic Activity",
+    short := "catalytic activity",
+    unit := "katal",
+    unit_symbol := "kat",
+    composed := cat_activity0.composed }
 
 def lum_efficacy := lum_intensity / power
 
@@ -427,23 +649,29 @@ structure Measure (α : Type) [ToString α] [Inhabited α] where
   quantity: α := default
 
 def set_decimal [Inhabited α] [ToString α] (m: Measure α) (d: Int) : Measure α  :=
-  {quantity:=m.quantity, quality:= set_decimalQ m.quality d}
+  { quantity := m.quantity,
+    quality := set_decimalQ m.quality d }
 
 def scalar_dec : Quality := decimal
 
 
 
 def non_measure [Inhabited α] [ToString α]: Measure α :=
-  { quality := forced, quantity := default }
+  { quality := forced,
+    quantity := default }
 
 -- not sure what the "default" value is: it is usually the identity for +
 -- in this case zero_measure is the identity element for Measure
 def zero_measure [Inhabited α] [ToString α]: Measure α :=
-  { quality := zeroQ, quantity := default }
+  { quality := zeroQ,
+    quantity := default }
 
--- one_measure is only defined here for Measure Float. It needs to be defined for each α for Measure α
+-- one_measure is only defined here for Measure Float.
+-- It needs to be defined for each α for Measure α
 -- one_measure is the identity element for multiplication for Measure
-def one_measure: Measure Float := { quality := scalar, quantity := 1.0 }
+def one_measure: Measure Float :=
+  { quality := scalar,
+    quantity := 1.0 }
 
 #eval one_measure.quantity
 #eval QtoString one_measure.quality
@@ -451,33 +679,45 @@ def one_measure: Measure Float := { quality := scalar, quantity := 1.0 }
 
 
 
-def add {α : Type} [Inhabited α] [ToString α](m: Measure α ) (n: Measure α ) [HAdd α α α]: Measure α :=
+def add {α : Type} [Inhabited α] [ToString α]
+  (m: Measure α ) (n: Measure α ) [HAdd α α α]: Measure α :=
   let aq := m.quality + n.quality
   if aq == forced then
     non_measure
   else
     let q:α := m.quantity + n.quantity
-    {quality:= aq, quantity:= q}
+    { quality:= aq,
+      quantity:= q }
 
 
 
 -- Define an instance of HAdd for Measure
--- instance {α : Type} [Inhabited α] [ToString α] [HAdd α α α] : HAdd (Measure α) (Measure α) (Measure α) :=
+-- instance {α : Type} [Inhabited α] [ToString α] [HAdd α α α] :
+-- HAdd (Measure α) (Measure α) (Measure α) :=
 -- {
 --   hAdd := add
 -- }
 
 
-def sub {α : Type} [Inhabited α] [ToString α] (m: Measure α ) (n: Measure α ) [HSub α α α]: Measure α :=
+def sub {α : Type} [Inhabited α] [ToString α]
+  (m: Measure α ) (n: Measure α ) [HSub α α α]: Measure α :=
   let aq := m.quality - n.quality
   if aq == forced then
     non_measure
   else
     let q:α := m.quantity - n.quantity
-    {quality:= aq, quantity:= q}
+    { quality:= aq,
+      quantity:= q }
 
-def mul {α : Type} [Inhabited α] [ToString α] (m: Measure α ) (n: Measure α ) [HMul α α α]: Measure α :=
-  {quality:= {composed:= mergeHashMaps m.quality.composed n.quality.composed,name:= n.quality.name ++ "·" ++ m.quality.name, short:="", unit:="", unit_symbol:=""}, quantity:= n.quantity * m.quantity}
+def mul {α : Type} [Inhabited α] [ToString α]
+  (m: Measure α ) (n: Measure α ) [HMul α α α]: Measure α :=
+  { quality :=
+    { composed := mergeHashMaps m.quality.composed n.quality.composed,
+      name := n.quality.name ++ "·" ++ m.quality.name,
+      short := "",
+      unit := "",
+      unit_symbol := "" },
+    quantity := n.quantity * m.quantity }
 
 def solve_decimal_to  (m: Measure Float) (d: Int) : Measure Float  :=
   let o_diff := dict_lookup m.quality.composed predecimal
@@ -490,52 +730,70 @@ def solve_decimal_to  (m: Measure Float) (d: Int) : Measure Float  :=
   let m2: Measure Float := {quality:=scalar_diff, quantity:= (Float.pow 10.0 (Float.ofInt diff))}
   mul m m2
 
-def div {α : Type} [Inhabited α] [ToString α] (m: Measure α ) (n: Measure α ) [HDiv α α α]: Measure α :=
-  {quality:= divQ m.quality n.quality, quantity:= n.quantity / m.quantity}
+def div {α : Type} [Inhabited α] [ToString α]
+  (m: Measure α ) (n: Measure α ) [HDiv α α α]: Measure α :=
+  { quality := divQ m.quality n.quality,
+    quantity := n.quantity / m.quantity }
 
 -- Ensure the `ToString` typeclass is available for Measure
 instance {α : Type} [ToString α] [Inhabited α] : ToString (Measure α) where
-  toString m :=
-    let unit := QtoString m.quality
-    -- let quantity := m.quantity
-    -- m.quantity.toString ++ unit
-    unit
+  toString m := QtoString m.quality
 
 
-def m_m1 : Measure Float := {quality:= mass, quantity:= 10.6}
+def m_m1 : Measure Float :=
+  { quality := mass,
+    quantity := 10.6 }
 
-def m_m2 : Measure Float := {quality:= mass, quantity:= 4.16}
+def m_m2 : Measure Float :=
+  { quality := mass,
+    quantity := 4.16 }
 
-def l_m2 : Measure Float := {quality:= length, quantity:= 14.6}
+def l_m2 : Measure Float :=
+  { quality := length,
+    quantity := 14.6 }
 
-def t_m2 : Measure Float := {quality:= time, quantity:= 4.6}
+def t_m2 : Measure Float :=
+  { quality := time,
+    quantity := 4.6 }
 
-def c : Measure Float := {quantity:= 299792458.0, quality:=speed}
+def c : Measure Float :=
+  { quantity := 299792458.0,
+    quality := speed }
 
-def freq_Cs : Measure Float := {quantity:= 9192631770.0, quality:=frequency}
+def freq_Cs : Measure Float :=
+  { quantity := 9192631770.0,
+    quality := frequency }
 
-def luminous_efficacy_540_THz : Measure Float := {quantity:= 683.0, quality:=lum_efficacy}
-
+def luminous_efficacy_540_THz : Measure Float :=
+  { quantity := 683.0,
+    quality := lum_efficacy }
 
 
 def scalar_23 := set_decimalQ scalar_dec 23
 def scalar__23 := set_decimalQ scalar_dec (-23)
 def scalar__19 := set_decimalQ scalar_dec (-19)
+def scalar__34 := set_decimalQ scalar_dec (-34)
 
-def avogadro_n : Measure Float := {quantity:=6.02214076, quality:= (scalar_23 / am_subst)}
+def avogadro_n : Measure Float :=
+  { quantity := 6.02214076,
+    quality := (scalar_23 / am_subst) }
 
 def av_no:= solve_decimal_to avogadro_n 20
 
-def scalar__34 := set_decimalQ scalar_dec (-34)
-
 -- Planck constant	6.62607015
-def h: Measure Float := {quantity:=6.62607015, quality:= (scalar__34 * time * energy)}
+def h: Measure Float :=
+  { quantity := 6.62607015,
+    quality := (scalar__34 * time * energy) }
 
 -- k	Boltzmann constant	1.380649×10−23 J/K
-def k: Measure Float := {quantity:=1.380649, quality:= (scalar__23 * energy/ temp)}
+def k: Measure Float :=
+  { quantity := 1.380649,
+    quality := (scalar__23 * energy/ temp) }
 
 -- e	elementary charge	1.602176634×10−19 C
-def e: Measure Float := {quantity:=1.380649, quality:= (scalar__19 * e_charge)}
+def e: Measure Float :=
+  { quantity := 1.380649,
+    quality := (scalar__19 * e_charge) }
 
 
 
@@ -584,7 +842,7 @@ def con2 := dict_insert con "freq_Cs" freq_Cs
 def con3 := dict_insert con2 "avogadro_n" avogadro_n
 
 #check dict_lookup con "c"
-def f:=dict_lookup con3 "avogadro_n"
+def f := dict_lookup con3 "avogadro_n"
 #eval f
 
 -- measureDict
