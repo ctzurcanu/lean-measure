@@ -1,8 +1,17 @@
 import Batteries.Data.HashMap.Basic
 import Mathlib
+
 -- import Mathlib.Algebra.MonoidAlgebra.Basic
 -- import Mathlib.Algebra.Ring.Basic
 
+set_option diagnostics true
+set_option diagnostics.threshold 90
+
+open Batteries (HashMap)
+
+/-- Hash maps with extensional equality. -/
+def Batteries.HashMapQuotient  {α β} [DecidableEq α] [Hashable α] [DecidableEq β] :=
+  Quotient (Setoid.ker HashMap.find? : Setoid (HashMap α β))
 
 
 -- Define a type alias for HashMap for convenience
@@ -44,7 +53,6 @@ def dict_lookup {key value : Type} [BEq key] [Hashable key]
 
 
 namespace measure
-
 
 
 structure PreQuality where
@@ -93,14 +101,14 @@ def preToQ (pq: PreQuality) : Quality :=
     composed := (dict_insert zero_dict pq 1),
     is_base := true }
 
-def prezeroQ: PreQuality :=
-  { name := "zeroQ",
-    short := "0q",
-    unit := "tzenit",
-    unit_symbol := "tz" }
+-- def prezeroQ: PreQuality :=
+--   { name := "zeroQ",
+--     short := "0q",
+--     unit := "tzenit",
+--     unit_symbol := "tz" }
 
 -- zeroQ is the identity element for addition for Quality
-def zeroQ: Quality := preToQ prezeroQ
+-- def zeroQ: Quality := preToQ prezeroQ
 
 -- oneQ is the identity element for multiplication for Quality
 def oneQ: Quality := scalar
@@ -157,22 +165,27 @@ def eqQ  (p : Quality) (q : Quality) : Bool :=
   else
     false
 
+-- Add simp rules for `eqQ`
+-- @[simp] lemma eqQ_eq (p q : Quality) : eqQ p q = (removeZeroValues p.composed 0 = removeZeroValues q.composed 0) :=
+--   by simp [eqQ]
+
 -- Define an instance of BEq for Quality
 instance : BEq Quality where
   beq x y := eqQ x y
+
+-- Define Decidable instance for Quality
+instance : DecidableEq Quality :=
+  fun (x y : Quality) =>
+    match eqQ x y with
+    | true  => isTrue  (by simp [eqQ])
+    | false => isFalse (by simp [eqQ])
 
 -- it handles the identity element zeroQ as a separate case
 def addQ (p : Quality) (q : Quality) :  Quality :=
   if eqHashMaps p.composed q.composed then
     p
   else
-    if eqHashMaps p.composed zeroQ.composed then
-      q
-    else
-      if eqHashMaps q.composed zeroQ.composed then
-        p
-      else
-        forced
+    forced
 
 
 
@@ -184,17 +197,7 @@ instance : HAdd Quality Quality Quality :=
 
 -- it handles the identity element zeroQ as a separate case
 def subQ (p : Quality) (q : Quality) :  Quality :=
-  if eqHashMaps p.composed q.composed then
-    p
-  else
-    if eqHashMaps p.composed zeroQ.composed then
-      q
-    else
-      if eqHashMaps q.composed zeroQ.composed then
-        p
-      else
-        forced
-
+  addQ p q
 
 -- Define an instance of HAdd for Quality
 instance : HSub Quality Quality Quality :=
@@ -244,8 +247,14 @@ instance : Pow Quality where
       unit := a.unit ++ "^" ++ (toString n),
       unit_symbol := a.unit_symbol ++ "^" ++ (toString n) }
 
--- Define a custom notation for Quality exponentiation
-notation a " ^ " b => Pow.pow a b
+-- Define a custom notation for Quality exponentiation (· + ·)
+
+-- instance : HPow Quality Int :=
+-- {
+--   hPow := Pow.pow Quality
+-- }
+
+
 
 -- notation:80 lhs:81 " ^ " rhs:80 => HPow.hPow lhs rhs
 
@@ -350,9 +359,9 @@ def area: Quality :=
     unit_symbol := "m^2",
     composed := area0.composed }
 
-def area2 := area + zeroQ
+def area2 := area + oneQ
 
-def area3 := zeroQ + area
+def area3 := oneQ + area
 
 def area4 := area / area
 
@@ -361,6 +370,15 @@ def area4 := area / area
 #eval QtoString area
 
 #eval QtoString area4
+
+def accel1 := length/ time / time
+
+def accel2 := oneQ / time / time * length
+
+#eval QtoString accel1
+#eval QtoString accel2
+
+#eval accel1 = accel2
 
 def volume0: Quality := Pow.pow length 3
 
@@ -663,7 +681,7 @@ def non_measure [Inhabited α] [ToString α]: Measure α :=
 -- not sure what the "default" value is: it is usually the identity for +
 -- in this case zero_measure is the identity element for Measure
 def zero_measure [Inhabited α] [ToString α]: Measure α :=
-  { quality := zeroQ,
+  { quality := oneQ,
     quantity := default }
 
 -- one_measure is only defined here for Measure Float.
@@ -794,6 +812,202 @@ def k: Measure Float :=
 def e: Measure Float :=
   { quantity := 1.380649,
     quality := (scalar__19 * e_charge) }
+
+
+-- Associativity ∀abc,(a∗b) ∗c= a∗(b∗c)
+-- Identity element ∀a,∃e,a∗e= e∗a= a
+-- Inverse element ∀a,∃b,a∗b= b∗a= e
+-- Commutativity ∀ab,a∗b= b∗a
+
+-- theorem trans_addQ : ∀ (a b : Quality), a + b = b + a := by
+--   intros a b
+--   simp [HAdd.hAdd]
+--   have h1 : addQ a b = if eqHashMaps a.composed b.composed then a
+--     else if eqHashMaps a.composed zeroQ.composed then b
+--     else if eqHashMaps b.composed zeroQ.composed then a
+--     else forced := by simp [addQ]
+--   have h2 : addQ b a = if eqHashMaps b.composed a.composed then b
+--     else if eqHashMaps b.composed zeroQ.composed then a
+--     else if eqHashMaps a.composed zeroQ.composed then b
+--     else forced := by simp [addQ]
+
+  -- exact h1.trans (h2.symm)
+
+theorem trans_addQ : ∀ (a b : Quality), addQ a b = addQ b a := by
+  intros a b
+
+ -- Case 1: Both `a.composed` and `b.composed` are equal
+  have h_eq_composed : eqHashMaps a.composed b.composed = eqHashMaps b.composed a.composed :=
+    by sorry
+
+  -- In this case, `addQ a b = a` and `addQ b a = b`
+  have h_case1 : eqHashMaps a.composed b.composed = true → addQ a b = addQ b a :=
+    by simp [addQ, h_eq_composed]
+
+  -- Case 2: `a.composed` is zero and `b.composed` is not zero
+  have h_case2 : eqHashMaps a.composed zeroQ.composed = true → addQ a b = addQ b a :=
+    by simp [addQ, eqHashMaps]
+
+  -- Case 3: `b.composed` is zero and `a.composed` is not zero
+  have h_case3 : eqHashMaps b.composed zeroQ.composed = true → addQ a b = addQ b a :=
+    by simp [addQ, eqHashMaps]
+
+  -- Case 4: Both `a.composed` and `b.composed` are not zero and not equal
+  have h_case4 : ¬ (eqHashMaps a.composed b.composed = true) ∧ ¬ (eqHashMaps a.composed zeroQ.composed = true) ∧ ¬ (eqHashMaps b.composed zeroQ.composed = true) →
+    addQ a b = addQ b a :=
+    by simp [addQ, eqHashMaps]
+
+  -- Combine all cases to prove the goal
+  -- We need to show that for any `a` and `b`, `addQ a b = addQ b a`
+  cases (eqHashMaps a.composed b.composed) with
+  | true =>
+    exact h_case1 (by simp [eqHashMaps])
+  | false =>
+    cases (eqHashMaps a.composed zeroQ.composed) with
+    | true =>
+      exact h_case2 (by simp [eqHashMaps])
+    | false =>
+      cases (eqHashMaps b.composed zeroQ.composed) with
+      | true =>
+        exact h_case3 (by simp [eqHashMaps])
+      | false =>
+        exact h_case4 (by simp [eqHashMaps])
+
+  -- Check if `a.composed` and `b.composed` are the same
+  -- have h_eq_composed : eqHashMaps a.composed b.composed = eqHashMaps b.composed a.composed :=
+  --   by simp [eqHashMaps]
+
+  -- -- Define `addQ a b`
+  -- have h_addQ_a_b : addQ a b =
+  --   if eqHashMaps a.composed b.composed then a
+  --   else if eqHashMaps a.composed zeroQ.composed then b
+  --   else if eqHashMaps b.composed zeroQ.composed then a
+  --   else forced :=
+  --   by simp [addQ]
+
+  -- -- Define `addQ b a`
+  -- have h_addQ_b_a : addQ b a =
+  --   if eqHashMaps b.composed a.composed then b
+  --   else if eqHashMaps b.composed zeroQ.composed then a
+  --   else if eqHashMaps a.composed zeroQ.composed then b
+  --   else forced :=
+  --   by simp [addQ]
+
+  -- -- Prove that the two expressions are equal
+  -- cases eqHashMaps a.composed b.composed
+  -- case true
+  -- {
+  --   -- Case where `eqHashMaps a.composed b.composed` is true
+  --   simp [h_addQ_a_b, h_addQ_b_a]
+  --   exact rfl
+  -- }
+  -- case false
+  -- {
+  --   -- Case where `eqHashMaps a.composed b.composed` is false
+  --   cases eqHashMaps a.composed zeroQ.composed
+  --   case true
+  --   {
+  --     -- Case where `eqHashMaps a.composed zeroQ.composed` is true
+  --     simp [h_addQ_a_b, h_addQ_b_a]
+  --     exact rfl
+  --   }
+  --   case false
+  --   {
+  --     -- Case where `eqHashMaps a.composed zeroQ.composed` is false
+  --     cases eqHashMaps b.composed zeroQ.composed
+  --     case true
+  --     {
+  --       -- Case where `eqHashMaps b.composed zeroQ.composed` is true
+  --       simp [h_addQ_a_b, h_addQ_b_a]
+  --       exact rfl
+  --     }
+  --     case false
+  --     {
+  --       -- Case where `eqHashMaps b.composed zeroQ.composed` is false
+  --       simp [h_addQ_a_b, h_addQ_b_a]
+  --       exact rfl
+  --     }
+  --   }
+  -- }
+
+-- theorem trans_addQ : ∀ (a b : Quality), a + b = b + a := by
+--   intros a b
+--   simp [HAdd.hAdd]
+--   have h1 : addQ a b = if eqHashMaps a.composed b.composed then a
+--     else if eqHashMaps a.composed zeroQ.composed then b
+--     else if eqHashMaps b.composed zeroQ.composed then a
+--     else forced :=
+--     by simp [addQ]
+--   -- Define the expression for `b + a`
+--   have h2 : addQ b a = if eqHashMaps b.composed a.composed then b
+--     else if eqHashMaps b.composed zeroQ.composed then a
+--     else if eqHashMaps a.composed zeroQ.composed then b
+--     else forced :=
+--     by simp [addQ]
+--   -- have h3: addQ a b = addQ b a := by exact
+--   -- calc
+--   --   addQ a b = addQ b a := by simp_all
+--   cases h1
+--   cases h2
+--   simp [eqHashMaps] at *
+--   exact h1
+  -- exact h1
+    -- cases h1;
+    -- cases h2;
+    -- simp [eqHashMaps] at *;
+    -- exact h1,
+
+
+     -- Prove the equality by checking cases
+  -- exact h3
+
+
+
+theorem assoc_addQ : ∀ (a b c : Quality), a + b + c = a + (b + c) := by
+  sorry
+
+  -- intros
+  -- rename_i a b c
+  -- apply Eq.trans
+  -- cases h with
+  -- | inr rh => simp
+  -- | inl lh => apply Eq.inr
+
+
+
+theorem zero_addQ : ∀ (a : Quality), zeroQ + a = a :=
+by sorry
+
+theorem addQ_zero : ∀ (a : Quality), a + zeroQ = a :=
+by sorry
+
+theorem comm_addQ : ∀ (a b : Quality), a + b = b + a :=
+by sorry
+
+theorem div_eq_addQ_inv : (∀ (a b : Quality), a - b = a + (zeroQ - b)) :=
+by sorry
+
+theorem addQ_l_inv : ∀ (a : Quality), (zeroQ - a) + a = zeroQ :=
+by sorry
+
+
+theorem assoc_mulQ : ∀ (a b c : Quality), a * b * c = a * (b * c) :=
+by sorry
+
+theorem one_mulQ : ∀ (a : Quality), oneQ * a = a :=
+by sorry
+
+theorem mulQ_one : ∀ (a : Quality), a * oneQ = a :=
+by sorry
+
+theorem comm_mulQ : ∀ (a b : Quality), a * b = b * a :=
+by sorry
+
+theorem div_eq_mulQ_inv : (∀ (a b : Quality), a / b = a * (Pow.pow b (-1))) :=
+by sorry
+
+theorem mulQ_l_inv : ∀ (a : Quality), (Pow.pow a (-1)) * a = oneQ :=
+by sorry
 
 
 
